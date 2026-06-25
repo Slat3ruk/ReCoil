@@ -1,0 +1,220 @@
+// ReCoil - Server Module
+// Manages and hardens your proxy server — imported by recoil.src
+// Depends on: R G Y C W D X DIV progress_bar
+
+// --- Hardcode your server credentials here ---
+SERVER_IP   = "0.0.0.0"
+SERVER_USER = "root"
+SERVER_PASS = "changeme"
+SERVER_PORT = 22
+
+rc_server = function()
+    print(G + "  [ ReCoil ] " + X + W + "Proxy Server" + X)
+    print(DIV)
+    print(W + "  Server  " + X + C + SERVER_IP + X + D + ":" + SERVER_PORT + X)
+    print("")
+
+    // --------------------------------------------------------
+    // CONNECT
+    // --------------------------------------------------------
+    print(D + "  Connecting..." + X)
+    srvShell = get_shell.connect_service(SERVER_IP, SERVER_PORT, SERVER_USER, SERVER_PASS, "ssh")
+
+    if typeof(srvShell) != "shell" then
+        print(R + "  [!] Connection failed: " + srvShell + X)
+        return
+    end if
+
+    print(G + "  [+] Connected" + X)
+    srvPC = srvShell.host_computer
+    print(W + "  Host    " + X + C + srvPC.local_ip + X + D + "  (" + srvPC.public_ip + ")" + X)
+    print(DIV)
+
+    // Sub-menu
+    while true
+        print(D + "  [1] " + X + W + "status    " + X + D + "show server state" + X)
+        print(D + "  [2] " + X + W + "harden    " + X + D + "audit and lock down server" + X)
+        print(D + "  [3] " + X + W + "processes " + X + D + "show running processes" + X)
+        print(D + "  [0] " + X + W + "back" + X)
+        print("")
+        choice = user_input(G + "  server" + X + D + " > " + X).trim
+
+        if choice == "1" or choice == "status" then
+            print("")
+            server_status(srvPC)
+            print("")
+        else if choice == "2" or choice == "harden" then
+            print("")
+            server_harden(srvPC)
+            print("")
+        else if choice == "3" or choice == "processes" then
+            print("")
+            server_procs(srvPC)
+            print("")
+        else if choice == "0" or choice == "back" or choice == "q" then
+            print(D + "  [*] Disconnected from server." + X)
+            print("")
+            return
+        else
+            print(D + "  [?] 1=status  2=harden  3=processes  0=back" + X)
+        end if
+    end while
+end function
+
+// --------------------------------------------------------
+// STATUS
+// --------------------------------------------------------
+server_status = function(srvPC)
+    print(G + "  [*] " + X + W + "Server Status" + X)
+    print(DIV)
+    print(W + "  Local IP   " + X + C + srvPC.local_ip + X)
+    print(W + "  Public IP  " + X + C + srvPC.public_ip + X)
+    print(W + "  Hostname   " + X + C + srvPC.get_name + X)
+    print(W + "  Net card   " + X + C + srvPC.active_net_card + X)
+    print(W + "  Network    " + X + (G + "active" + X if srvPC.is_network_active else R + "DOWN" + X))
+    print("")
+
+    // Open ports
+    ports = srvPC.get_ports
+    if ports == null or ports.len == 0 then
+        print(D + "  No open ports." + X)
+    else
+        router = get_router(SERVER_IP)
+        print(W + "  Open ports:" + X)
+        for p in ports
+            info = ""
+            if router != null then info = router.port_info(p)
+            print(D + "    :" + X + Y + p.port_number + X + D + "  " + info + X)
+        end for
+    end if
+    print(DIV)
+
+    // SSH reachable check
+    router = get_router(SERVER_IP)
+    if router != null then
+        sshPort = router.ping_port(SERVER_PORT)
+        if sshPort != null then
+            print(G + "  [+] SSH reachable on :" + SERVER_PORT + X)
+        else
+            print(R + "  [!] SSH not visible on :" + SERVER_PORT + " — check port forward" + X)
+        end if
+    end if
+end function
+
+// --------------------------------------------------------
+// HARDEN
+// --------------------------------------------------------
+server_harden = function(srvPC)
+    print(G + "  [*] " + X + W + "Hardening Server" + X)
+    print(DIV)
+
+    issues = 0
+
+    // User audit
+    print(G + "  [*] " + X + "User audit...")
+    print("")
+    passwdFile = srvPC.File("/etc/passwd")
+    if passwdFile == null then
+        print(R + "  [!] Cannot read /etc/passwd" + X)
+    else
+        knownUsers = [SERVER_USER, "guest"]
+        lines = passwdFile.get_content.split(char(10))
+        for line in lines
+            if line.trim == "" then continue
+            parts    = line.split(":")
+            username = parts[0]
+            if knownUsers.indexOf(username) == -1 then
+                print(Y + "  [!] Unknown user: " + X + C + username + X)
+                choice = user_input(D + "      Delete? [y/n]: " + X).lower
+                if choice == "y" then
+                    result = srvPC.delete_user(username, 0)
+                    if result == 1 then
+                        print(G + "  [+] Deleted: " + username + X)
+                    else
+                        print(R + "  [!] Failed: " + result + X)
+                    end if
+                else
+                    print(D + "      Skipped." + X)
+                end if
+                issues = issues + 1
+            else
+                print(D + "  [ok] " + username + X)
+            end if
+        end for
+    end if
+
+    print("")
+
+    // File permission lockdown
+    print(G + "  [*] " + X + "Locking file permissions...")
+    print("")
+
+    criticalPaths = ["/etc/passwd", "/etc/", "/lib/", "/bin/"]
+    total  = criticalPaths.len
+    locked = 0
+
+    for i in range(0, criticalPaths.len - 1)
+        print(progress_bar(i, total, 24))
+        path = criticalPaths[i]
+        f    = srvPC.File(path)
+        if f == null then
+            print(Y + "  [!] Not found: " + path + X)
+            continue
+        end if
+        recursive = (f.is_folder == 1)
+        result    = f.chmod("o-rwx", recursive)
+        if result == 1 or result == "" then
+            print(G + "  [+] " + X + D + path + X)
+            locked = locked + 1
+        else
+            print(R + "  [!] chmod failed: " + path + " — " + result + X)
+            issues = issues + 1
+        end if
+    end for
+
+    print(progress_bar(total, total, 24))
+    print("")
+    print(DIV)
+
+    if issues == 0 then
+        print(G + "  [+] Server hardened. No issues found." + X)
+    else
+        print(Y + "  [*] " + X + W + issues + " issue(s) flagged." + X)
+    end if
+end function
+
+// --------------------------------------------------------
+// PROCESSES
+// --------------------------------------------------------
+server_procs = function(srvPC)
+    print(G + "  [*] " + X + W + "Running Processes" + X)
+    print(DIV)
+
+    procs = srvPC.show_procs
+    lines = procs.split(char(10))
+
+    for i in range(1, lines.len - 1)
+        line = lines[i].trim
+        if line == "" then continue
+        parts   = line.split(" ")
+        pUser   = parts[0]
+        pid     = parts[1]
+        command = parts[4]
+
+        if pUser == SERVER_USER or pUser == "root" then
+            print(D + "  [ok] " + X + W + command + X + D + "  pid=" + pid + "  user=" + pUser + X)
+        else
+            print(Y + "  [!] " + X + C + command + X + D + "  pid=" + pid + "  user=" + pUser + X)
+            choice = user_input(D + "      Kill? [y/n]: " + X).lower
+            if choice == "y" then
+                result = srvPC.close_program(pid.to_int)
+                if result == 1 then
+                    print(G + "  [+] Killed pid " + pid + X)
+                else
+                    print(R + "  [!] Failed: " + result + X)
+                end if
+            end if
+        end if
+    end for
+    print("")
+end function

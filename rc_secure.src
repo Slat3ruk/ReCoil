@@ -1,0 +1,166 @@
+// ReCoil - Secure Module
+// Hardens the local machine — imported by recoil.src
+// Depends on: R G Y C W D X DIV progress_bar
+
+rc_secure = function()
+    myShell = get_shell
+    myPC    = myShell.host_computer
+
+    print(G + "  [ ReCoil ] " + X + W + "Secure Local Machine" + X)
+    print(DIV)
+
+    issues = 0
+
+    // --------------------------------------------------------
+    // 1. USER AUDIT
+    // --------------------------------------------------------
+    print(G + "  [*] " + X + W + "User audit..." + X)
+    print("")
+
+    passwdFile = myPC.File("/etc/passwd")
+    if passwdFile == null then
+        print(R + "  [!] Cannot read /etc/passwd" + X)
+    else
+        knownUsers = ["root", "guest", active_user]
+        lines = passwdFile.get_content.split(char(10))
+        for line in lines
+            if line.trim == "" then continue
+            parts    = line.split(":")
+            username = parts[0]
+            if knownUsers.indexOf(username) == -1 then
+                print(Y + "  [!] Unknown user: " + X + C + username + X)
+                choice = user_input(D + "      Delete this user? [y/n]: " + X).lower
+                if choice == "y" then
+                    result = myPC.delete_user(username, 0)
+                    if result == 1 then
+                        print(G + "  [+] Deleted: " + username + X)
+                    else
+                        print(R + "  [!] Failed: " + result + X)
+                    end if
+                else
+                    print(D + "      Skipped." + X)
+                end if
+                issues = issues + 1
+            else
+                print(D + "  [ok] " + X + username + X)
+            end if
+        end for
+    end if
+
+    print("")
+    print(DIV)
+
+    // --------------------------------------------------------
+    // 2. PROCESS AUDIT
+    // --------------------------------------------------------
+    print(G + "  [*] " + X + W + "Process audit..." + X)
+    print("")
+
+    procs = myPC.show_procs
+    lines = procs.split(char(10))
+    // skip header row
+    for i in range(1, lines.len - 1)
+        line = lines[i].trim
+        if line == "" then continue
+        parts   = line.split(" ")
+        pUser   = parts[0]
+        pid     = parts[1]
+        command = parts[4]
+
+        if pUser != active_user and pUser != "root" then
+            print(Y + "  [!] Foreign process: " + X + C + command + X + D + "  pid=" + pid + "  user=" + pUser + X)
+            choice = user_input(D + "      Kill this process? [y/n]: " + X).lower
+            if choice == "y" then
+                result = myPC.close_program(pid.to_int)
+                if result == 1 then
+                    print(G + "  [+] Killed pid " + pid + X)
+                else
+                    print(R + "  [!] Failed: " + result + X)
+                end if
+            else
+                print(D + "      Skipped." + X)
+            end if
+            issues = issues + 1
+        else
+            print(D + "  [ok] " + X + command + D + "  pid=" + pid + X)
+        end if
+    end for
+
+    print("")
+    print(DIV)
+
+    // --------------------------------------------------------
+    // 3. FILE PERMISSION LOCKDOWN
+    // --------------------------------------------------------
+    print(G + "  [*] " + X + W + "Locking critical file permissions..." + X)
+    print("")
+
+    criticalPaths = [
+        "/etc/passwd",
+        "/etc/",
+        "/lib/",
+        "/bin/"
+    ]
+
+    total   = criticalPaths.len
+    locked  = 0
+
+    for i in range(0, criticalPaths.len - 1)
+        print(progress_bar(i, total, 24))
+        path = criticalPaths[i]
+        f    = myPC.File(path)
+        if f == null then
+            print(Y + "  [!] Not found: " + path + X)
+            continue
+        end if
+
+        recursive = (f.is_folder == 1)
+        result    = f.chmod("o-rwx", recursive)
+
+        if result == 1 or result == "" then
+            print(G + "  [+] " + X + D + path + X)
+            locked = locked + 1
+        else
+            print(R + "  [!] chmod failed on " + path + ": " + result + X)
+            issues = issues + 1
+        end if
+    end for
+
+    print(progress_bar(total, total, 24))
+    print("")
+    print(DIV)
+
+    // --------------------------------------------------------
+    // 4. OPEN PORT REPORT
+    // --------------------------------------------------------
+    print(G + "  [*] " + X + W + "Open port check..." + X)
+    print("")
+
+    ports = myPC.get_ports
+    if ports == null or ports.len == 0 then
+        print(D + "  [ok] No open ports." + X)
+    else
+        router = get_router
+        for p in ports
+            info = ""
+            if router != null then info = router.port_info(p)
+            print(Y + "  [!] Open port: " + X + C + ":" + p.port_number + X + D + "  " + info + X)
+            issues = issues + 1
+        end for
+        print("")
+        print(D + "  [*] Close unused services manually via terminal." + X)
+    end if
+
+    print("")
+    print(DIV)
+
+    // --------------------------------------------------------
+    // SUMMARY
+    // --------------------------------------------------------
+    if issues == 0 then
+        print(G + "  [+] Machine is clean. No issues found." + X)
+    else
+        print(Y + "  [*] " + X + W + issues + " issue(s) flagged." + X)
+    end if
+    print("")
+end function

@@ -2,6 +2,8 @@
 // Usage: build then run /bin/recoil
 
 import_code("/bin/rc_scan")
+import_code("/bin/rc_secure")
+import_code("/bin/rc_server")
 
 // --- ReCoil colour palette (shared with all modules) ---
 R = "<color=#FF4444><b>"
@@ -48,6 +50,8 @@ print_banner = function()
     print(D + "  [scan]  " + X + W + "scan       " + X + D + "map the current LAN" + X)
     print(D + "  [net]   " + X + W + "whois      " + X + D + "lookup a public IP" + X)
     print(D + "  [net]   " + X + W + "nslookup   " + X + D + "resolve a hostname" + X)
+    print(D + "  [sec]   " + X + W + "secure     " + X + D + "audit and harden this machine" + X)
+    print(D + "  [srv]   " + X + W + "server     " + X + D + "manage and harden proxy server" + X)
     print(D + "  --------------------------------" + X + D + " standalone " + X + D + "-------------------------" + X)
     print(D + "  [wifi]  " + X + W + "wifi       " + X + D + "launch wifi suite  (crack + hop)" + X)
     print(D + "  --------------------------------" + X)
@@ -64,6 +68,8 @@ print_help = function()
     print(Y + "  scan" + X + D + "          — map all devices + ports on the LAN" + X)
     print(Y + "  whois [ip]" + X + D + "    — get public info on an IP" + X)
     print(Y + "  nslookup [h]" + X + D + "  — resolve a hostname to IP" + X)
+    print(Y + "  secure" + X + D + "        — audit and harden this machine" + X)
+    print(Y + "  server" + X + D + "        — manage and harden proxy server" + X)
     print(Y + "  clear" + X + D + "         — redraw the banner" + X)
     print(Y + "  help" + X + D + "          — this list" + X)
     print(Y + "  exit / q" + X + D + "      — quit ReCoil" + X)
@@ -88,6 +94,18 @@ while true
         print(G + "  [ ReCoil ] " + X + W + "IP Scanner" + X)
         print(DIV)
         rc_scan
+        print("")
+
+    // --- secure ---
+    else if cmd == "secure" then
+        print("")
+        rc_secure
+        print("")
+
+    // --- server ---
+    else if cmd == "server" then
+        print("")
+        rc_server
         print("")
 
     // --- whois ---
