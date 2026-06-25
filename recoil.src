@@ -4,6 +4,7 @@
 import_code("/bin/rc_scan")
 import_code("/bin/rc_secure")
 import_code("/bin/rc_server")
+import_code("/bin/rc_exploit")
 
 // --- ReCoil colour palette (shared with all modules) ---
 R = "<color=#FF4444><b>"
@@ -52,6 +53,10 @@ print_banner = function()
     print(D + "  [net]   " + X + W + "nslookup   " + X + D + "resolve a hostname" + X)
     print(D + "  [sec]   " + X + W + "secure     " + X + D + "audit and harden this machine" + X)
     print(D + "  [srv]   " + X + W + "server     " + X + D + "manage and harden proxy server" + X)
+    print(D + "  [xpl]   " + X + W + "exploit    " + X + D + "scan and exploit a target IP" + X)
+    print(D + "  [xpl]   " + X + W + "shells     " + X + D + "list active shell buffer" + X)
+    print(D + "  [xpl]   " + X + W + "use [n]    " + X + D + "interact with a buffered shell" + X)
+    print(D + "  [xpl]   " + X + W + "drop [n]   " + X + D + "remove shell from buffer" + X)
     print(D + "  --------------------------------" + X + D + " standalone " + X + D + "-------------------------" + X)
     print(D + "  [wifi]  " + X + W + "wifi       " + X + D + "launch wifi suite  (crack + hop)" + X)
     print(D + "  --------------------------------" + X)
@@ -70,6 +75,10 @@ print_help = function()
     print(Y + "  nslookup [h]" + X + D + "  — resolve a hostname to IP" + X)
     print(Y + "  secure" + X + D + "        — audit and harden this machine" + X)
     print(Y + "  server" + X + D + "        — manage and harden proxy server" + X)
+    print(Y + "  exploit [ip]" + X + D + "  — scan and exploit a target" + X)
+    print(Y + "  shells" + X + D + "        — list active shell buffer" + X)
+    print(Y + "  use [n]" + X + D + "       — interact with buffered shell" + X)
+    print(Y + "  drop [n]" + X + D + "      — remove shell from buffer" + X)
     print(Y + "  clear" + X + D + "         — redraw the banner" + X)
     print(Y + "  help" + X + D + "          — this list" + X)
     print(Y + "  exit / q" + X + D + "      — quit ReCoil" + X)
@@ -94,6 +103,34 @@ while true
         print(G + "  [ ReCoil ] " + X + W + "IP Scanner" + X)
         print(DIV)
         rc_scan
+        print("")
+
+    // --- exploit ---
+    else if cmd.indexOf("exploit") == 0 then
+        parts = cmd.split(" ")
+        ip    = (parts[1] if parts.len > 1 else "")
+        print("")
+        rc_exploit(ip)
+
+    // --- shells ---
+    else if cmd == "shells" then
+        print("")
+        rc_shells
+        print("")
+
+    // --- use ---
+    else if cmd.indexOf("use") == 0 then
+        parts = cmd.split(" ")
+        idx   = (parts[1] if parts.len > 1 else "")
+        print("")
+        rc_use(idx)
+
+    // --- drop ---
+    else if cmd.indexOf("drop") == 0 then
+        parts = cmd.split(" ")
+        idx   = (parts[1] if parts.len > 1 else "")
+        print("")
+        rc_drop(idx)
         print("")
 
     // --- secure ---
