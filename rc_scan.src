@@ -1,0 +1,108 @@
+// ReCoil - Scanner Module
+// Imported by recoil.src — do not run directly
+// Depends on: R G Y C W D X DIV progress_bar  (defined in recoil.src)
+
+rc_scan = function()
+    myPC   = get_shell.host_computer
+    router = get_router
+
+    if router == null then
+        print(R + "  [!] No router found. Are you connected?" + X)
+        return
+    end if
+
+    pubIP = router.public_ip
+    lanIP = router.local_ip
+
+    print(W + "  Public IP  " + X + C + pubIP + X)
+    print(W + "  Gateway    " + X + C + lanIP + X)
+    print(DIV)
+
+    devices = router.devices_lan_ip
+    if devices == null or devices.len == 0 then
+        print(R + "  [!] No devices found on LAN." + X)
+        return
+    end if
+
+    total = devices.len
+    print(G + "  [*] " + X + W + total + " device(s) found — scanning..." + X)
+    print("")
+
+    totalOpen = 0
+    scanned   = 0
+
+    for ip in devices
+        print(progress_bar(scanned, total, 24))
+
+        ports     = router.device_ports(ip)
+        openPorts = []
+        if ports != null then
+            for p in ports
+                if not p.is_closed then openPorts.push(p)
+            end for
+        end if
+
+        if openPorts.len > 0 then
+            print(C + "  " + ip + X)
+            for p in openPorts
+                info    = router.port_info(p)
+                portNum = p.port_number
+                svc     = ""
+                ver     = ""
+                if info != null then
+                    parts = info.split(" ")
+                    svc   = parts[0]
+                    if parts.len > 1 then ver = parts[1]
+                end if
+                line = W + "    :" + portNum + X
+                if svc != "" then
+                    line = line + Y + "  " + svc + X
+                    if ver != "" then line = line + D + " v" + ver + X
+                end if
+                print(line)
+                totalOpen = totalOpen + 1
+            end for
+        else
+            print(D + "  " + ip + "  (no open ports)" + X)
+        end if
+
+        print("")
+        scanned = scanned + 1
+    end for
+
+    print(progress_bar(total, total, 24))
+    print("")
+    print(DIV)
+    print(G + "  [*] " + X + W + "Scan complete" + X + D + "  devices: " + total + "  open ports: " + totalOpen + X)
+    print("")
+
+    // Save results
+    savePath = home_dir + "/scan_results.txt"
+    out = "=== ReCoil IP Scan ===" + char(10)
+    out = out + "Public IP : " + pubIP + char(10)
+    out = out + "Gateway   : " + lanIP + char(10)
+    out = out + "Devices   : " + total + char(10) + char(10)
+
+    for ip in devices
+        ports = router.device_ports(ip)
+        out   = out + ip + char(10)
+        if ports != null then
+            for p in ports
+                if not p.is_closed then
+                    out = out + "  :" + p.port_number + "  " + router.port_info(p) + char(10)
+                end if
+            end for
+        end if
+        out = out + char(10)
+    end for
+
+    scanFile = myPC.File(savePath)
+    if scanFile == null then
+        myPC.touch(home_dir, "scan_results.txt")
+        myPC.File(savePath).set_content(out)
+    else
+        scanFile.set_content(out)
+    end if
+
+    print(D + "  [*] Results saved to " + savePath + X)
+end function

@@ -1,0 +1,148 @@
+// ReCoil - Main Hub
+// Usage: build then run /bin/recoil
+
+import_code("/bin/rc_scan")
+
+// --- ReCoil colour palette (shared with all modules) ---
+R = "<color=#FF4444><b>"
+G = "<color=#00FF88><b>"
+Y = "<color=#FFCC00><b>"
+C = "<color=#00CCFF><b>"
+W = "<color=#FFFFFF><b>"
+D = "<color=#888888>"
+X = "</color></b>"
+DIV = D + "  --------------------------------" + X
+
+// --- Shared progress bar (available to all imported modules) ---
+progress_bar = function(current, total, width)
+    if total <= 0 then return ""
+    pct    = floor((current / total) * 100)
+    filled = floor((current / total) * width)
+    empty  = width - filled
+    bar    = ""
+    for i in range(1, filled)
+        bar = bar + char(9608)
+    end for
+    for i in range(1, empty)
+        bar = bar + char(9617)
+    end for
+    return D + "  [" + X + G + bar + X + D + "] " + X + Y + pct + "%" + X
+end function
+
+// --- Banner ---
+print_banner = function()
+    clear_screen
+    print("")
+    print(G + "  ██████╗ ███████╗ ██████╗ ██████╗ ██╗██╗" + X)
+    print(G + "  ██╔══██╗██╔════╝██╔════╝██╔═══██╗██║██║" + X)
+    print(G + "  ██████╔╝█████╗  ██║     ██║   ██║██║██║" + X)
+    print(G + "  ██╔══██╗██╔══╝  ██║     ██║   ██║██║██║" + X)
+    print(G + "  ██║  ██║███████╗╚██████╗╚██████╔╝██║███████╗" + X)
+    print(G + "  ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝╚══════╝" + X)
+    print("")
+    print(D + "  --------------------------------" + X + Y + " v1.0 " + X + D + "--------------------------------" + X)
+    myPC  = get_shell.host_computer
+    print(W + "  user    " + X + C + active_user + X)
+    print(W + "  host    " + X + C + myPC.local_ip + X + D + "  (" + myPC.public_ip + ")" + X)
+    print(D + "  --------------------------------" + X + G + " tools " + X + D + "--------------------------------" + X)
+    print(D + "  [scan]  " + X + W + "scan       " + X + D + "map the current LAN" + X)
+    print(D + "  [net]   " + X + W + "whois      " + X + D + "lookup a public IP" + X)
+    print(D + "  [net]   " + X + W + "nslookup   " + X + D + "resolve a hostname" + X)
+    print(D + "  --------------------------------" + X + D + " standalone " + X + D + "-------------------------" + X)
+    print(D + "  [wifi]  " + X + W + "wifi       " + X + D + "launch wifi suite  (crack + hop)" + X)
+    print(D + "  --------------------------------" + X)
+    print(D + "  type " + X + W + "help" + X + D + " for command list   " + X + W + "exit" + X + D + " to quit" + X)
+    print(D + "  --------------------------------" + X)
+    print("")
+end function
+
+// --- Help ---
+print_help = function()
+    print("")
+    print(G + "  [ ReCoil ] " + X + W + "Commands" + X)
+    print(DIV)
+    print(Y + "  scan" + X + D + "          — map all devices + ports on the LAN" + X)
+    print(Y + "  whois [ip]" + X + D + "    — get public info on an IP" + X)
+    print(Y + "  nslookup [h]" + X + D + "  — resolve a hostname to IP" + X)
+    print(Y + "  clear" + X + D + "         — redraw the banner" + X)
+    print(Y + "  help" + X + D + "          — this list" + X)
+    print(Y + "  exit / q" + X + D + "      — quit ReCoil" + X)
+    print(DIV)
+    print(D + "  standalone: run " + X + W + "wifi" + X + D + " from your terminal for the WiFi suite" + X)
+    print("")
+end function
+
+// ============================================================
+// MAIN LOOP
+// ============================================================
+print_banner
+
+while true
+    cmd = user_input(G + "  recoil" + X + D + " > " + X).trim
+
+    if cmd == "" then continue
+
+    // --- scan ---
+    if cmd == "scan" then
+        print("")
+        print(G + "  [ ReCoil ] " + X + W + "IP Scanner" + X)
+        print(DIV)
+        rc_scan
+        print("")
+
+    // --- whois ---
+    else if cmd.indexOf("whois") == 0 then
+        parts = cmd.split(" ")
+        if parts.len < 2 then
+            print(R + "  [!] usage: whois [ip]" + X)
+        else
+            ip     = parts[1]
+            result = whois(ip)
+            print("")
+            if result == null or result == "" then
+                print(R + "  [!] No result for " + ip + X)
+            else
+                print(G + "  [ whois ] " + X + C + ip + X)
+                print(DIV)
+                for line in result.split(char(10))
+                    print(D + "  " + X + line)
+                end for
+            end if
+            print("")
+        end if
+
+    // --- nslookup ---
+    else if cmd.indexOf("nslookup") == 0 then
+        parts = cmd.split(" ")
+        if parts.len < 2 then
+            print(R + "  [!] usage: nslookup [hostname]" + X)
+        else
+            host   = parts[1]
+            result = nslookup(host)
+            print("")
+            if result == null or result == "" then
+                print(R + "  [!] Could not resolve: " + host + X)
+            else
+                print(G + "  [+] " + X + C + host + X + D + "  ->  " + X + Y + result + X)
+            end if
+            print("")
+        end if
+
+    // --- clear / banner ---
+    else if cmd == "clear" then
+        print_banner
+
+    // --- help ---
+    else if cmd == "help" then
+        print_help
+
+    // --- exit ---
+    else if cmd == "exit" or cmd == "q" then
+        print(D + "  [*] exiting ReCoil." + X)
+        print("")
+        exit()
+
+    else
+        print(D + "  [?] unknown command — type " + X + W + "help" + X)
+    end if
+end while

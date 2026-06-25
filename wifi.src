@@ -1,0 +1,299 @@
+// ReCoil - WiFi Suite  (standalone)
+// Combines crack and hop into one tool
+
+// --- ReCoil colour palette ---
+R = "<color=#FF4444><b>"
+G = "<color=#00FF88><b>"
+Y = "<color=#FFCC00><b>"
+C = "<color=#00CCFF><b>"
+W = "<color=#FFFFFF><b>"
+D = "<color=#888888>"
+X = "</color></b>"
+DIV = D + "  --------------------------------" + X
+
+progress_bar = function(current, total, width)
+    if total <= 0 then return ""
+    pct    = floor((current / total) * 100)
+    filled = floor((current / total) * width)
+    empty  = width - filled
+    bar    = ""
+    for i in range(1, filled)
+        bar = bar + char(9608)
+    end for
+    for i in range(1, empty)
+        bar = bar + char(9617)
+    end for
+    return D + "  [" + X + G + bar + X + D + "] " + X + Y + pct + "%" + X
+end function
+
+// ============================================================
+// CRACK
+// ============================================================
+run_crack = function()
+    crypto = include_lib("/lib/crypto.so")
+    if crypto == null then
+        print(R + "  [!] crypto.so not found in /lib" + X)
+        return
+    end if
+
+    myPC = get_shell.host_computer
+
+    // Detect wifi interface
+    devices = myPC.network_devices
+    wifiDev = null
+    for line in devices.split(char(10))
+        if line.indexOf("WIFI") != -1 then
+            wifiDev = line.split(" ")[0]
+            break
+        end if
+    end for
+    if wifiDev == null then
+        print(R + "  [!] No WiFi card found." + X)
+        return
+    end if
+
+    print(W + "  Interface  " + X + C + wifiDev + X)
+
+    // Enable monitor mode
+    print(W + "  Mode       " + X + D + "enabling monitor..." + X)
+    monResult = crypto.airmon("start", wifiDev)
+    if typeof(monResult) == "string" then
+        print(R + "  [!] airmon: " + monResult + X)
+        return
+    end if
+    print(W + "  Mode       " + X + G + "monitor active" + X)
+    print(DIV)
+
+    // Scan
+    print(G + "  [*] " + X + "Scanning for networks...")
+    networks = myPC.wifi_networks(wifiDev)
+    if networks == null or networks.len == 0 then
+        crypto.airmon("stop", wifiDev)
+        print(R + "  [!] No networks found." + X)
+        return
+    end if
+
+    // Parse and sort by signal descending
+    parsed = []
+    for entry in networks
+        parts = entry.split(" ")
+        if parts.len < 3 then continue
+        parsed.push({"bssid": parts[0], "pwr": parts[1][:-1].to_int, "essid": parts[2]})
+    end for
+    n = parsed.len
+    for i in range(0, n - 2)
+        for j in range(0, n - 2 - i)
+            if parsed[j]["pwr"] < parsed[j + 1]["pwr"] then
+                tmp = parsed[j]
+                parsed[j] = parsed[j + 1]
+                parsed[j + 1] = tmp
+            end if
+        end for
+    end for
+
+    print(G + "  [*] " + X + W + parsed.len + " network(s)  (sorted by signal)" + X)
+    print("")
+    print(D + "       BSSID              PWR    ESSID" + X)
+    for i in range(0, parsed.len - 1)
+        net = parsed[i]
+        print(D + "  " + i + "  " + X + C + net["bssid"] + X + D + "  " + net["pwr"] + "  " + X + W + net["essid"] + X)
+    end for
+    print("")
+    print(DIV)
+    print(G + "  [*] " + X + "Starting crack sequence...")
+    print("")
+
+    savePath = home_dir + "/wifi_creds.txt"
+    cracked  = 0
+    failed   = 0
+    total    = parsed.len
+
+    for i in range(0, parsed.len - 1)
+        net     = parsed[i]
+        bssid   = net["bssid"]
+        pwr     = net["pwr"]
+        essid   = net["essid"]
+        maxAcks = round(300000 / (pwr + 15))
+
+        print(progress_bar(i, total, 24))
+        print(W + "  Target  " + X + C + essid + X + D + "  pwr=" + pwr + "  acks=" + maxAcks + X)
+
+        capResult = crypto.aireplay(bssid, essid, maxAcks)
+        if typeof(capResult) == "string" then
+            print(R + "  [!] aireplay: " + capResult + X)
+            failed = failed + 1
+            print("")
+            continue
+        end if
+
+        capFile = home_dir + "/file.cap"
+        if myPC.File(capFile) == null then
+            print(R + "  [!] No capture file. Skipping." + X)
+            failed = failed + 1
+            print("")
+            continue
+        end if
+
+        password = crypto.aircrack(capFile)
+        if password == null then
+            print(R + "  [!] Crack failed." + X)
+            failed = failed + 1
+            print("")
+            continue
+        end if
+
+        print(G + "  [+] " + X + Y + password + X)
+        cracked = cracked + 1
+
+        entry     = essid + " | " + bssid + " | " + password + char(10)
+        credsFile = myPC.File(savePath)
+        if credsFile == null then
+            myPC.touch(home_dir, "wifi_creds.txt")
+            myPC.File(savePath).set_content(entry)
+        else
+            credsFile.set_content(credsFile.get_content + entry)
+        end if
+        print("")
+    end for
+
+    print(progress_bar(total, total, 24))
+    crypto.airmon("stop", wifiDev)
+    print("")
+    print(DIV)
+    print(G + "  [*] " + X + W + "Done" + X + D + "  cracked: " + X + G + cracked + X + D + "  failed: " + X + R + failed + X)
+    print(D + "  [*] Saved to " + savePath + X)
+end function
+
+// ============================================================
+// HOP
+// ============================================================
+run_hop = function()
+    HOP_INTERVAL = 30
+
+    myPC = get_shell.host_computer
+
+    // Detect wifi interface
+    devices = myPC.network_devices
+    wifiDev = null
+    for line in devices.split(char(10))
+        if line.indexOf("WIFI") != -1 then
+            wifiDev = line.split(" ")[0]
+            break
+        end if
+    end for
+    if wifiDev == null then
+        print(R + "  [!] No WiFi card found." + X)
+        return
+    end if
+
+    print(W + "  Interface  " + X + C + wifiDev + X)
+    print(W + "  Interval   " + X + Y + HOP_INTERVAL + "s" + X)
+    print(DIV)
+
+    // Load credentials
+    credsPath = home_dir + "/wifi_creds.txt"
+    credsFile = myPC.File(credsPath)
+    networks  = []
+
+    if credsFile != null then
+        print(G + "  [*] " + X + "Loading " + credsPath)
+        for line in credsFile.get_content.split(char(10))
+            line = line.trim
+            if line == "" then continue
+            parts = line.split(" | ")
+            if parts.len >= 3 then
+                networks.push({"essid": parts[0], "bssid": parts[1], "pass": parts[2]})
+            end if
+        end for
+    else
+        print(Y + "  [!] No wifi_creds.txt — manual entry" + X)
+        essid = user_input("  ESSID    : ")
+        bssid = user_input("  BSSID    : ")
+        pass  = user_input("  Password : ")
+        networks.push({"essid": essid, "bssid": bssid, "pass": pass})
+    end if
+
+    if networks.len == 0 then
+        print(R + "  [!] No networks loaded." + X)
+        return
+    end if
+
+    print(G + "  [*] " + X + W + networks.len + " network(s) queued" + X)
+    print(DIV)
+    print(Y + "  [*] Hopping... Ctrl+C to stop." + X)
+    print("")
+
+    idx = 0
+    hop = 0
+
+    while true
+        net   = networks[idx]
+        essid = net["essid"]
+        bssid = net["bssid"]
+        pass  = net["pass"]
+        hop   = hop + 1
+
+        print(D + "  [hop " + hop + "]" + X + " " + C + essid + X + D + "  " + bssid + X)
+
+        result = myPC.connect_wifi(wifiDev, bssid, essid, pass)
+
+        if typeof(result) == "string" then
+            print(R + "  [!] " + result + X)
+        else
+            print(G + "  [+] " + X + W + myPC.local_ip + X + D + "  gw: " + myPC.network_gateway + X)
+
+            router = get_router
+            if router != null then
+                lanDevs = router.devices_lan_ip
+                for ip in lanDevs
+                    ports = router.device_ports(ip)
+                    openPorts = []
+                    if ports != null then
+                        for p in ports
+                            if not p.is_closed then openPorts.push(p.port_number)
+                        end for
+                    end if
+                    if openPorts.len > 0 then
+                        print(D + "      " + X + C + ip + X + D + "  " + openPorts.join("  ") + X)
+                    end if
+                end for
+            end if
+
+            wait(HOP_INTERVAL)
+        end if
+
+        print("")
+        idx = idx + 1
+        if idx >= networks.len then idx = 0
+    end while
+end function
+
+// ============================================================
+// MENU
+// ============================================================
+print("")
+print(G + "  [ ReCoil ] " + X + W + "WiFi Suite" + X)
+print(DIV)
+print(D + "  [1] " + X + W + "crack  " + X + D + "crack all nearby networks" + X)
+print(D + "  [2] " + X + W + "hop    " + X + D + "rotate through cracked networks" + X)
+print(D + "  [0] " + X + W + "exit" + X)
+print(DIV)
+
+while true
+    choice = user_input(G + "  wifi" + X + D + " > " + X)
+
+    if choice == "1" or choice == "crack" then
+        print("")
+        run_crack
+        print("")
+    else if choice == "2" or choice == "hop" then
+        print("")
+        run_hop
+        print("")
+    else if choice == "0" or choice == "exit" or choice == "q" then
+        print(D + "  [*] exiting." + X)
+        exit()
+    else
+        print(D + "  [?] 1=crack  2=hop  0=exit" + X)
+    end if
+end while
