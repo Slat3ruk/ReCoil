@@ -1,0 +1,123 @@
+// ReCoil - WiFi Cracker
+// Scans all networks, sorts by signal strength (highest first), cracks each one automatically
+
+crypto = include_lib("/lib/crypto.so")
+if crypto == null then exit("<color=red>[!] crypto.so not found in /lib</color>")
+
+myShell = get_shell
+myPC = myShell.host_computer
+
+// --- Detect wifi interface ---
+devices = myPC.network_devices
+wifiDev = null
+for line in devices.split(char(10))
+    if line.indexOf("WIFI") != -1 then
+        wifiDev = line.split(" ")[0]
+        break
+    end if
+end for
+
+if wifiDev == null then exit("<color=red>[!] No WiFi card found.</color>")
+print("<color=lime>[*] Using interface: " + wifiDev + "</color>")
+
+// --- Enable monitor mode ---
+print("[*] Enabling monitor mode...")
+monResult = crypto.airmon("start", wifiDev)
+if typeof(monResult) == "string" then exit("<color=red>[!] airmon error: " + monResult + "</color>")
+print("<color=lime>[+] Monitor mode enabled.</color>")
+
+// --- Scan for networks ---
+print("[*] Scanning for WiFi networks...")
+networks = myPC.wifi_networks(wifiDev)
+
+if networks == null or networks.len == 0 then
+    crypto.airmon("stop", wifiDev)
+    exit("<color=red>[!] No networks found.</color>")
+end if
+
+// --- Parse and sort by signal power (descending) ---
+parsed = []
+for entry in networks
+    parts = entry.split(" ")
+    if parts.len < 3 then continue
+    bssid = parts[0]
+    pwr   = parts[1][:-1].to_int
+    essid = parts[2]
+    parsed.push({"bssid": bssid, "pwr": pwr, "essid": essid})
+end for
+
+// Bubble sort descending by pwr
+n = parsed.len
+for i in range(0, n - 2)
+    for j in range(0, n - 2 - i)
+        if parsed[j]["pwr"] < parsed[j + 1]["pwr"] then
+            tmp = parsed[j]
+            parsed[j] = parsed[j + 1]
+            parsed[j + 1] = tmp
+        end if
+    end for
+end for
+
+print("")
+print("<color=yellow>  #   BSSID              PWR   ESSID</color>")
+print("<color=yellow>  --  -----------------  ----  -----</color>")
+for i in range(0, parsed.len - 1)
+    net = parsed[i]
+    print("  " + i + "   " + net["bssid"] + "   " + net["pwr"] + "   " + net["essid"])
+end for
+print("")
+
+// --- Crack all networks highest signal first ---
+savePath = home_dir + "/wifi_creds.txt"
+cracked  = 0
+failed   = 0
+
+for net in parsed
+    bssid   = net["bssid"]
+    pwr     = net["pwr"]
+    essid   = net["essid"]
+    maxAcks = round(300000 / (pwr + 15))
+
+    print("[>] Targeting: <color=cyan>" + essid + "</color>  pwr=" + pwr + "  acks=" + maxAcks)
+
+    capResult = crypto.aireplay(bssid, essid, maxAcks)
+    if typeof(capResult) == "string" then
+        print("<color=red>    [!] aireplay failed: " + capResult + "</color>")
+        failed = failed + 1
+        continue
+    end if
+
+    capFile = home_dir + "/file.cap"
+    if myPC.File(capFile) == null then
+        print("<color=red>    [!] No capture file produced. Skipping.</color>")
+        failed = failed + 1
+        continue
+    end if
+
+    password = crypto.aircrack(capFile)
+
+    if password == null then
+        print("<color=red>    [!] Crack failed.</color>")
+        failed = failed + 1
+        continue
+    end if
+
+    print("<color=lime>    [+] Cracked: </color><color=yellow>" + password + "</color>")
+    cracked = cracked + 1
+
+    // Append to creds file
+    entry     = essid + " | " + bssid + " | " + password + char(10)
+    credsFile = myPC.File(savePath)
+    if credsFile == null then
+        myPC.touch(home_dir, "wifi_creds.txt")
+        myPC.File(savePath).set_content(entry)
+    else
+        credsFile.set_content(credsFile.get_content + entry)
+    end if
+end for
+
+// --- Done ---
+crypto.airmon("stop", wifiDev)
+print("")
+print("<color=lime>[*] Done.  Cracked: " + cracked + "  Failed: " + failed + "</color>")
+print("[*] Credentials saved to " + savePath)
