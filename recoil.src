@@ -5,6 +5,7 @@ import_code("/bin/rc_scan")
 import_code("/bin/rc_secure")
 import_code("/bin/rc_server")
 import_code("/bin/rc_exploit")
+import_code("/bin/rc_pivot")
 
 // --- ReCoil colour palette (shared with all modules) ---
 R = "<color=#FF4444><b>"
@@ -57,6 +58,10 @@ print_banner = function()
     print(D + "  [xpl]   " + X + W + "shells     " + X + D + "list active shell buffer" + X)
     print(D + "  [xpl]   " + X + W + "use [n]    " + X + D + "interact with a buffered shell" + X)
     print(D + "  [xpl]   " + X + W + "drop [n]   " + X + D + "remove shell from buffer" + X)
+    print(D + "  [pvt]   " + X + W + "pivot [n]  " + X + D + "SSH to new target through buffer[n]" + X)
+    print(D + "  [pvt]   " + X + W + "pull [n]   " + X + D + "download file from buffer[n]" + X)
+    print(D + "  [pvt]   " + X + W + "push [n]   " + X + D + "upload file to buffer[n]" + X)
+    print(D + "  [pvt]   " + X + W + "creds      " + X + D + "list stored credentials" + X)
     print(D + "  --------------------------------" + X + D + " standalone " + X + D + "-------------------------" + X)
     print(D + "  [wifi]  " + X + W + "wifi       " + X + D + "launch wifi suite  (crack + hop)" + X)
     print(D + "  --------------------------------" + X)
@@ -77,8 +82,12 @@ print_help = function()
     print(Y + "  server" + X + D + "        — manage and harden proxy server" + X)
     print(Y + "  exploit [ip]" + X + D + "  — scan and exploit a target" + X)
     print(Y + "  shells" + X + D + "        — list active shell buffer" + X)
-    print(Y + "  use [n]" + X + D + "       — interact with buffered shell" + X)
-    print(Y + "  drop [n]" + X + D + "      — remove shell from buffer" + X)
+    print(Y + "  use [n]" + X + D + "             — interact with buffered shell" + X)
+    print(Y + "  drop [n]" + X + D + "            — remove shell from buffer" + X)
+    print(Y + "  pivot [n] [ip]" + X + D + "      — SSH to target through buffer[n]" + X)
+    print(Y + "  pull [n] [path]" + X + D + "     — download file from buffer[n]" + X)
+    print(Y + "  push [n] [src] [dst]" + X + D + " — upload file to buffer[n]" + X)
+    print(Y + "  creds" + X + D + "               — list stored credentials" + X)
     print(Y + "  clear" + X + D + "         — redraw the banner" + X)
     print(Y + "  help" + X + D + "          — this list" + X)
     print(Y + "  exit / q" + X + D + "      — quit ReCoil" + X)
@@ -131,6 +140,37 @@ while true
         idx   = (parts[1] if parts.len > 1 else "")
         print("")
         rc_drop(idx)
+        print("")
+
+    // --- pivot ---
+    else if cmd.indexOf("pivot") == 0 then
+        parts = cmd.split(" ")
+        idx   = (parts[1] if parts.len > 1 else "")
+        ip    = (parts[2] if parts.len > 2 else "")
+        print("")
+        rc_pivot(idx, ip)
+
+    // --- pull ---
+    else if cmd.indexOf("pull") == 0 then
+        parts = cmd.split(" ")
+        idx   = (parts[1] if parts.len > 1 else "")
+        path  = (parts[2] if parts.len > 2 else "")
+        print("")
+        rc_pull(idx, path)
+
+    // --- push ---
+    else if cmd.indexOf("push") == 0 then
+        parts      = cmd.split(" ")
+        idx        = (parts[1] if parts.len > 1 else "")
+        localPath  = (parts[2] if parts.len > 2 else "")
+        remotePath = (parts[3] if parts.len > 3 else "/tmp")
+        print("")
+        rc_push(idx, localPath, remotePath)
+
+    // --- creds ---
+    else if cmd == "creds" then
+        print("")
+        rc_creds
         print("")
 
     // --- secure ---

@@ -1,0 +1,234 @@
+// ReCoil - Pivot Module
+// Chain through buffered shells to reach deeper targets
+// Imported by recoil.src
+// Depends on: R G Y C W D X DIV  +  get_custom_object RC_SHELLS
+
+// --------------------------------------------------------
+// PIVOT — SSH through a buffered shell to a new target
+// --------------------------------------------------------
+rc_pivot = function(idxStr, targetIP)
+    obj    = get_custom_object
+    shells = obj.RC_SHELLS
+    idx    = idxStr.to_int
+
+    if typeof(idx) == "string" or idx < 0 or idx >= shells.len then
+        print(R + "  [!] Invalid shell index. Use 'shells' to list." + X)
+        return
+    end if
+
+    if targetIP == "" or targetIP == null then
+        print(R + "  [!] Usage: pivot [n] [targetIP]" + X)
+        return
+    end if
+
+    if not is_valid_ip(targetIP) then
+        resolved = nslookup(targetIP)
+        if resolved == null or resolved == "" then
+            print(R + "  [!] Could not resolve: " + targetIP + X)
+            return
+        end if
+        targetIP = resolved
+    end if
+
+    entry     = shells[idx]
+    hopShell  = entry["shell"]
+    hopIP     = entry["ip"]
+    hopChain  = (entry["chain"] if entry.hasIndex("chain") else hopIP)
+
+    print(G + "  [ ReCoil ] " + X + W + "Pivot" + X)
+    print(DIV)
+    print(W + "  Hop via  " + X + C + hopIP + X)
+    print(W + "  Target   " + X + C + targetIP + X)
+    print(W + "  Chain    " + X + D + hopChain + " -> " + targetIP + X)
+    print(DIV)
+
+    // Check stored creds first
+    storedCreds = _rc_get_creds(targetIP)
+    user = ""
+    pass = ""
+
+    if storedCreds != null then
+        print(D + "  [*] Stored creds found for " + targetIP + X)
+        user = storedCreds["user"]
+        pass = storedCreds["pass"]
+        print(W + "  User  " + X + Y + user + X)
+        useStored = user_input(D + "  Use these? [y/n]: " + X).lower
+        if useStored != "y" then
+            user = ""
+            pass = ""
+        end if
+    end if
+
+    if user == "" then
+        user = user_input(W + "  Username : " + X)
+        pass = user_input(W + "  Password : " + X)
+    end if
+
+    port = 22
+
+    print("")
+    print(D + "  Connecting through hop..." + X)
+
+    result = hopShell.connect_service(targetIP, port, user, pass, "ssh")
+
+    if typeof(result) != "shell" then
+        print(R + "  [!] Pivot failed: " + result + X)
+        return
+    end if
+
+    // Determine level on new shell
+    newPC  = result.host_computer
+    rootDir = newPC.File("/")
+    level  = "guest"
+    if rootDir != null then
+        if rootDir.has_permission("w") then
+            level = "root"
+        else
+            homeDir = newPC.File("/home")
+            if homeDir != null and homeDir.has_permission("w") then level = "user"
+        end if
+    end if
+
+    col = G
+    if level == "guest" then col = R else if level != "root" then col = Y
+
+    print(col + "  [+] Shell obtained — level: " + level + X)
+
+    // Store in buffer with chain info
+    newEntry = {
+        "ip":    targetIP,
+        "shell": result,
+        "level": level,
+        "chain": hopChain + " -> " + targetIP
+    }
+    obj.RC_SHELLS.push(newEntry)
+    newIdx = obj.RC_SHELLS.len - 1
+
+    print(G + "  [+] " + X + "Stored as buffer " + W + "[" + newIdx + "]" + X)
+    print(D + "      chain: " + hopChain + " -> " + C + targetIP + X)
+    print(D + "      use " + X + W + "use " + newIdx + X + D + " to interact" + X)
+    print("")
+end function
+
+// --------------------------------------------------------
+// PULL — download a file from a buffered shell
+// --------------------------------------------------------
+rc_pull = function(idxStr, remotePath)
+    obj    = get_custom_object
+    shells = obj.RC_SHELLS
+    idx    = idxStr.to_int
+
+    if typeof(idx) == "string" or idx < 0 or idx >= shells.len then
+        print(R + "  [!] Invalid shell index." + X)
+        return
+    end if
+
+    if remotePath == "" or remotePath == null then
+        print(R + "  [!] Usage: pull [n] [remotepath]" + X)
+        return
+    end if
+
+    entry      = shells[idx]
+    targetShell = entry["shell"]
+    targetIP   = entry["ip"]
+    myShell    = get_shell
+    destFolder = home_dir + "/loot"
+
+    // Create loot folder if it doesn't exist
+    myPC = myShell.host_computer
+    if myPC.File(destFolder) == null then
+        myPC.create_folder(home_dir, "loot")
+    end if
+
+    print(D + "  Pulling " + X + W + remotePath + X + D + " from " + X + C + targetIP + X + D + "..." + X)
+
+    // scp: called on REMOTE shell, isUpload=0 means remote->local
+    result = targetShell.scp(remotePath, destFolder, myShell, 0)
+
+    if result == 1 then
+        fname = remotePath.split("/")[-1]
+        print(G + "  [+] " + X + "Saved to " + Y + destFolder + "/" + fname + X)
+    else
+        print(R + "  [!] Pull failed: " + result + X)
+    end if
+    print("")
+end function
+
+// --------------------------------------------------------
+// PUSH — upload a file to a buffered shell
+// --------------------------------------------------------
+rc_push = function(idxStr, localPath, remotePath)
+    obj    = get_custom_object
+    shells = obj.RC_SHELLS
+    idx    = idxStr.to_int
+
+    if typeof(idx) == "string" or idx < 0 or idx >= shells.len then
+        print(R + "  [!] Invalid shell index." + X)
+        return
+    end if
+
+    if localPath == "" or localPath == null then
+        print(R + "  [!] Usage: push [n] [localpath] [remotefolder]" + X)
+        return
+    end if
+
+    if remotePath == "" or remotePath == null then
+        remotePath = "/tmp"
+    end if
+
+    entry       = shells[idx]
+    targetShell = entry["shell"]
+    targetIP    = entry["ip"]
+    myShell     = get_shell
+
+    print(D + "  Pushing " + X + W + localPath + X + D + " to " + X + C + targetIP + ":" + remotePath + X + D + "..." + X)
+
+    // scp: called on LOCAL shell, isUpload=1 means local->remote
+    result = myShell.scp(localPath, remotePath, targetShell, 1)
+
+    if result == 1 then
+        fname = localPath.split("/")[-1]
+        print(G + "  [+] " + X + "Pushed to " + Y + targetIP + ":" + remotePath + "/" + fname + X)
+    else
+        print(R + "  [!] Push failed: " + result + X)
+    end if
+    print("")
+end function
+
+// --------------------------------------------------------
+// INTERNAL — look up stored creds for an IP
+// --------------------------------------------------------
+_rc_get_creds = function(ip)
+    obj = get_custom_object
+    if not obj.hasIndex("RC_CREDS") then return null
+    if obj.RC_CREDS.hasIndex(ip) then return obj.RC_CREDS[ip]
+    return null
+end function
+
+// --------------------------------------------------------
+// STORE CREDS — save cracked credentials for reuse
+// --------------------------------------------------------
+rc_store_creds = function(ip, user, pass)
+    obj = get_custom_object
+    if not obj.hasIndex("RC_CREDS") then obj.RC_CREDS = {}
+    obj.RC_CREDS[ip] = {"user": user, "pass": pass}
+    print(G + "  [+] " + X + "Creds stored for " + C + ip + X)
+end function
+
+// --------------------------------------------------------
+// CREDS — list all stored credentials
+// --------------------------------------------------------
+rc_creds = function()
+    obj = get_custom_object
+    if not obj.hasIndex("RC_CREDS") or obj.RC_CREDS.len == 0 then
+        print(D + "  [*] No credentials stored." + X)
+        return
+    end if
+    print(G + "  [*] " + X + W + "Stored Credentials" + X)
+    print(DIV)
+    for ip in obj.RC_CREDS.indexes
+        entry = obj.RC_CREDS[ip]
+        print(C + "  " + ip + X + D + "  " + X + W + entry["user"] + X + D + "  :  " + X + Y + entry["pass"] + X)
+    end for
+    print("")
+end function
