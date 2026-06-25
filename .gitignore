@@ -1,0 +1,5 @@
+# API docs and generated files
+*.htm
+*.html
+*_files/
+api_stripped.txt
