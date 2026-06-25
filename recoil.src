@@ -49,6 +49,12 @@ print_banner = function()
     myPC  = get_shell.host_computer
     print(W + "  user    " + X + C + active_user + X)
     print(W + "  host    " + X + C + myPC.local_ip + X + D + "  (" + myPC.public_ip + ")" + X)
+    srvStatus = get_shell.ping(SERVER_IP)
+    if srvStatus == 1 then
+        print(W + "  proxy   " + X + C + SERVER_IP + X + G + "  ● online" + X)
+    else
+        print(W + "  proxy   " + X + C + SERVER_IP + X + R + "  ● offline" + X)
+    end if
     print(D + "  --------------------------------" + X + G + " tools " + X + D + "--------------------------------" + X)
     print(D + "  [scan]  " + X + W + "scan       " + X + D + "map the current LAN" + X)
     print(D + "  [net]   " + X + W + "whois      " + X + D + "lookup a public IP" + X)

@@ -162,5 +162,20 @@ rc_secure = function()
     else
         print(Y + "  [*] " + X + W + issues + " issue(s) flagged." + X)
     end if
+
+    // --------------------------------------------------------
+    // PASSWORD CHANGE
+    // --------------------------------------------------------
+    print("")
+    changePw = user_input(D + "  Change your password? [y/n]: " + X).lower
+    if changePw == "y" then
+        newPw    = user_input(W + "  New password: " + X)
+        result   = myPC.change_password(active_user, newPw)
+        if result == 1 then
+            print(G + "  [+] Password changed successfully." + X)
+        else
+            print(R + "  [!] Failed: " + result + X)
+        end if
+    end if
     print("")
 end function
