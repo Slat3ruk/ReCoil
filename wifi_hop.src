@@ -1,13 +1,24 @@
 // ReCoil - WiFi Hopper
-// Rotates through cracked networks on a timer to avoid active connection detection.
-// Each network is used briefly then abandoned before anyone can trace back to you.
-//
-// NOTE: Grey Hack logs SSH/FTP connections per session. WiFi connections themselves
-// don't produce logs on the router — but staying on one network while doing work
-// does. This hopper limits dwell time per network to keep your presence minimal.
+// Rotates through cracked networks on a timer to minimise dwell time
 
-HOP_INTERVAL = 30   // seconds to stay on each network before rotating (adjust as needed)
+HOP_INTERVAL = 30   // seconds per network before rotating
 
+// --- ReCoil colour palette ---
+R = "<color=#FF4444><b>"
+G = "<color=#00FF88><b>"
+Y = "<color=#FFCC00><b>"
+C = "<color=#00CCFF><b>"
+W = "<color=#FFFFFF><b>"
+D = "<color=#888888>"
+X = "</color></b>"
+DIV = D + "  --------------------------------" + X
+
+// --- Header ---
+print("")
+print(G + "  [ ReCoil ] " + X + W + "WiFi Hopper" + X)
+print(DIV)
+
+// --- Setup ---
 myShell = get_shell
 myPC    = myShell.host_computer
 
@@ -21,7 +32,10 @@ for line in devices.split(char(10))
     end if
 end for
 
-if wifiDev == null then exit("<color=red>[!] No WiFi card found.</color>")
+if wifiDev == null then exit(R + "  [!] No WiFi card found." + X)
+print(W + "  Interface  " + X + C + wifiDev + X)
+print(W + "  Interval   " + X + Y + HOP_INTERVAL + "s" + X)
+print(DIV)
 
 // --- Load credentials ---
 credsPath = home_dir + "/wifi_creds.txt"
@@ -29,7 +43,7 @@ credsFile = myPC.File(credsPath)
 networks  = []
 
 if credsFile != null then
-    print("<color=lime>[*] Loading credentials from " + credsPath + "</color>")
+    print(G + "  [*] " + X + "Loading " + credsPath)
     for line in credsFile.get_content.split(char(10))
         line = line.trim
         if line == "" then continue
@@ -39,42 +53,43 @@ if credsFile != null then
         end if
     end for
 else
-    print("<color=yellow>[!] No wifi_creds.txt found. Enter network manually.</color>")
-    essid = user_input("ESSID: ")
-    bssid = user_input("BSSID: ")
-    pass  = user_input("Password: ")
+    print(Y + "  [!] No wifi_creds.txt — manual entry" + X)
+    essid = user_input("  ESSID    : ")
+    bssid = user_input("  BSSID    : ")
+    pass  = user_input("  Password : ")
     networks.push({"essid": essid, "bssid": bssid, "pass": pass})
 end if
 
-if networks.len == 0 then exit("<color=red>[!] No networks loaded.</color>")
+if networks.len == 0 then exit(R + "  [!] No networks loaded." + X)
 
-print("<color=yellow>[*] " + networks.len + " network(s) loaded. Hop interval: " + HOP_INTERVAL + "s</color>")
-print("<color=yellow>[*] Press Ctrl+C to stop.</color>")
+print(G + "  [*] " + X + W + networks.len + " network(s) queued" + X)
+print(DIV)
+print(Y + "  [*] Hopping... Ctrl+C to stop." + X)
 print("")
 
-idx = 0   // current position in network list
+idx  = 0
+hop  = 0
 
 while true
     net   = networks[idx]
     essid = net["essid"]
     bssid = net["bssid"]
     pass  = net["pass"]
+    hop   = hop + 1
 
-    print("--------------------------------------------")
-    print("[>] Hopping to: <color=cyan>" + essid + "</color>  (" + bssid + ")")
+    print(D + "  [hop " + hop + "]" + X + " " + C + essid + X + D + "  " + bssid + X)
 
     result = myPC.connect_wifi(wifiDev, bssid, essid, pass)
 
     if typeof(result) == "string" then
-        print("<color=red>[!] Connect failed: " + result + " — skipping.</color>")
+        print(R + "  [!] " + result + X)
     else
-        print("<color=lime>[+] Connected</color>  IP: " + myPC.local_ip + "  GW: " + myPC.network_gateway)
+        print(G + "  [+] " + X + W + myPC.local_ip + X + D + "  gw: " + myPC.network_gateway + X)
 
-        // --- Quick LAN scan while connected ---
+        // --- Quick LAN scan ---
         router = get_router
         if router != null then
             lanDevs = router.devices_lan_ip
-            print("[*] LAN: " + lanDevs.len + " device(s)")
             for ip in lanDevs
                 ports = router.device_ports(ip)
                 openPorts = []
@@ -84,16 +99,15 @@ while true
                     end for
                 end if
                 if openPorts.len > 0 then
-                    print("    <color=yellow>" + ip + "</color>  open: " + openPorts.join(", "))
+                    print(D + "      " + X + C + ip + X + D + "  " + openPorts.join("  ") + X)
                 end if
             end for
         end if
 
-        print("[*] Dwelling for " + HOP_INTERVAL + "s...")
         wait(HOP_INTERVAL)
     end if
 
-    // Advance to next network, wrap around
+    print("")
     idx = idx + 1
     if idx >= networks.len then idx = 0
 end while

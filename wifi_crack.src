@@ -1,11 +1,44 @@
 // ReCoil - WiFi Cracker
-// Scans all networks, sorts by signal strength (highest first), cracks each one automatically
+// Scans all networks, sorts by signal strength (highest first), cracks each one
 
+// --- ReCoil colour palette ---
+R = "<color=#FF4444><b>"
+G = "<color=#00FF88><b>"
+Y = "<color=#FFCC00><b>"
+C = "<color=#00CCFF><b>"
+W = "<color=#FFFFFF><b>"
+D = "<color=#888888>"
+X = "</color></b>"
+DIV = D + "  --------------------------------" + X
+
+// --- Progress bar helper ---
+// Returns a string like:  [████████░░░░░░░░]  50%
+progress_bar = function(current, total, width)
+    if total <= 0 then return ""
+    pct    = floor((current / total) * 100)
+    filled = floor((current / total) * width)
+    empty  = width - filled
+    bar    = ""
+    for i in range(1, filled)
+        bar = bar + char(9608)   // █
+    end for
+    for i in range(1, empty)
+        bar = bar + char(9617)   // ░
+    end for
+    return D + "  [" + X + G + bar + X + D + "] " + X + Y + pct + "%" + X
+end function
+
+// --- Header ---
+print("")
+print(G + "  [ ReCoil ] " + X + W + "WiFi Cracker" + X)
+print(DIV)
+
+// --- Setup ---
 crypto = include_lib("/lib/crypto.so")
-if crypto == null then exit("<color=red>[!] crypto.so not found in /lib</color>")
+if crypto == null then exit(R + "  [!] crypto.so not found in /lib" + X)
 
 myShell = get_shell
-myPC = myShell.host_computer
+myPC    = myShell.host_computer
 
 // --- Detect wifi interface ---
 devices = myPC.network_devices
@@ -17,36 +50,33 @@ for line in devices.split(char(10))
     end if
 end for
 
-if wifiDev == null then exit("<color=red>[!] No WiFi card found.</color>")
-print("<color=lime>[*] Using interface: " + wifiDev + "</color>")
+if wifiDev == null then exit(R + "  [!] No WiFi card found." + X)
+print(W + "  Interface  " + X + C + wifiDev + X)
 
 // --- Enable monitor mode ---
-print("[*] Enabling monitor mode...")
+print(W + "  Mode       " + X + D + "enabling monitor..." + X)
 monResult = crypto.airmon("start", wifiDev)
-if typeof(monResult) == "string" then exit("<color=red>[!] airmon error: " + monResult + "</color>")
-print("<color=lime>[+] Monitor mode enabled.</color>")
+if typeof(monResult) == "string" then exit(R + "  [!] airmon: " + monResult + X)
+print(W + "  Mode       " + X + G + "monitor active" + X)
+print(DIV)
 
 // --- Scan for networks ---
-print("[*] Scanning for WiFi networks...")
+print(G + "  [*] " + X + "Scanning for networks...")
 networks = myPC.wifi_networks(wifiDev)
 
 if networks == null or networks.len == 0 then
     crypto.airmon("stop", wifiDev)
-    exit("<color=red>[!] No networks found.</color>")
+    exit(R + "  [!] No networks found." + X)
 end if
 
-// --- Parse and sort by signal power (descending) ---
+// --- Parse and sort by signal power descending ---
 parsed = []
 for entry in networks
     parts = entry.split(" ")
     if parts.len < 3 then continue
-    bssid = parts[0]
-    pwr   = parts[1][:-1].to_int
-    essid = parts[2]
-    parsed.push({"bssid": bssid, "pwr": pwr, "essid": essid})
+    parsed.push({"bssid": parts[0], "pwr": parts[1][:-1].to_int, "essid": parts[2]})
 end for
 
-// Bubble sort descending by pwr
 n = parsed.len
 for i in range(0, n - 2)
     for j in range(0, n - 2 - i)
@@ -58,54 +88,63 @@ for i in range(0, n - 2)
     end for
 end for
 
+print(G + "  [*] " + X + W + parsed.len + " network(s) found  (sorted by signal)" + X)
 print("")
-print("<color=yellow>  #   BSSID              PWR   ESSID</color>")
-print("<color=yellow>  --  -----------------  ----  -----</color>")
+print(D + "       BSSID              PWR    ESSID" + X)
 for i in range(0, parsed.len - 1)
     net = parsed[i]
-    print("  " + i + "   " + net["bssid"] + "   " + net["pwr"] + "   " + net["essid"])
+    print(D + "  " + i + "  " + X + C + net["bssid"] + X + D + "  " + net["pwr"] + "  " + X + W + net["essid"] + X)
 end for
 print("")
 
-// --- Crack all networks highest signal first ---
+// --- Crack all networks ---
 savePath = home_dir + "/wifi_creds.txt"
 cracked  = 0
 failed   = 0
+total    = parsed.len
 
-for net in parsed
+print(DIV)
+print(G + "  [*] " + X + "Starting crack sequence...")
+print("")
+
+for i in range(0, parsed.len - 1)
+    net     = parsed[i]
     bssid   = net["bssid"]
     pwr     = net["pwr"]
     essid   = net["essid"]
     maxAcks = round(300000 / (pwr + 15))
 
-    print("[>] Targeting: <color=cyan>" + essid + "</color>  pwr=" + pwr + "  acks=" + maxAcks)
+    print(progress_bar(i, total, 24))
+    print(W + "  Target  " + X + C + essid + X + D + "  pwr=" + pwr + "  acks=" + maxAcks + X)
 
     capResult = crypto.aireplay(bssid, essid, maxAcks)
     if typeof(capResult) == "string" then
-        print("<color=red>    [!] aireplay failed: " + capResult + "</color>")
+        print(R + "  [!] aireplay: " + capResult + X)
         failed = failed + 1
+        print("")
         continue
     end if
 
     capFile = home_dir + "/file.cap"
     if myPC.File(capFile) == null then
-        print("<color=red>    [!] No capture file produced. Skipping.</color>")
+        print(R + "  [!] No capture file. Skipping." + X)
         failed = failed + 1
+        print("")
         continue
     end if
 
     password = crypto.aircrack(capFile)
 
     if password == null then
-        print("<color=red>    [!] Crack failed.</color>")
+        print(R + "  [!] Crack failed." + X)
         failed = failed + 1
+        print("")
         continue
     end if
 
-    print("<color=lime>    [+] Cracked: </color><color=yellow>" + password + "</color>")
+    print(G + "  [+] " + X + Y + password + X)
     cracked = cracked + 1
 
-    // Append to creds file
     entry     = essid + " | " + bssid + " | " + password + char(10)
     credsFile = myPC.File(savePath)
     if credsFile == null then
@@ -114,10 +153,14 @@ for net in parsed
     else
         credsFile.set_content(credsFile.get_content + entry)
     end if
+    print("")
 end for
 
-// --- Done ---
+// --- Final bar and summary ---
+print(progress_bar(total, total, 24))
 crypto.airmon("stop", wifiDev)
 print("")
-print("<color=lime>[*] Done.  Cracked: " + cracked + "  Failed: " + failed + "</color>")
-print("[*] Credentials saved to " + savePath)
+print(DIV)
+print(G + "  [*] " + X + W + "Done" + X + D + "  cracked: " + X + G + cracked + X + D + "  failed: " + X + R + failed + X)
+print(D + "  [*] Credentials saved to " + savePath + X)
+print("")
