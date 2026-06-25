@@ -1,0 +1,186 @@
+// ReCoil - Operations Module
+// Log cleaning and persistence — imported by recoil.src
+// Depends on: R G Y C W D X DIV
+
+// --------------------------------------------------------
+// CLEAN — wipe our IP from logs on a buffered shell target
+// --------------------------------------------------------
+rc_clean = function(idxStr)
+    obj    = get_custom_object
+    shells = obj.RC_SHELLS
+    idx    = idxStr.to_int
+
+    if typeof(idx) == "string" or idx < 0 or idx >= shells.len then
+        print(R + "  [!] Usage: clean [n]  — use 'shells' to list" + X)
+        return
+    end if
+
+    entry    = shells[idx]
+    targetPC = entry["shell"].host_computer
+    targetIP = entry["ip"]
+    myIP     = get_shell.host_computer.public_ip
+
+    print(G + "  [ ReCoil ] " + X + W + "Log Cleaner" + X)
+    print(DIV)
+    print(W + "  Target   " + X + C + targetIP + X)
+    print(W + "  Erasing  " + X + D + myIP + X)
+    print(DIV)
+
+    // All known log locations in Grey Hack
+    logPaths = [
+        "/var/log/auth.log",
+        "/var/log/syslog",
+        "/var/log/kern.log",
+        "/var/log/apache2/access.log",
+        "/var/log/apache2/error.log"
+    ]
+
+    totalRemoved = 0
+    checked      = 0
+
+    for path in logPaths
+        f = targetPC.File(path)
+        if f == null then
+            print(D + "  skip  " + path + X)
+            checked = checked + 1
+            continue
+        end if
+
+        if not f.has_permission("w") then
+            print(Y + "  [!]  " + X + D + path + X + R + "  no write permission" + X)
+            checked = checked + 1
+            continue
+        end if
+
+        content  = f.get_content
+        lines    = content.split(char(10))
+        cleaned  = []
+        removed  = 0
+
+        for line in lines
+            if line.indexOf(myIP) != -1 then
+                removed = removed + 1
+            else
+                cleaned.push(line)
+            end if
+        end for
+
+        f.set_content(cleaned.join(char(10)))
+        totalRemoved = totalRemoved + removed
+
+        if removed > 0 then
+            print(G + "  [+]  " + X + D + path + X + G + "  -" + removed + " entries" + X)
+        else
+            print(D + "  [ok] " + path + "  (clean)" + X)
+        end if
+
+        checked = checked + 1
+    end for
+
+    print(DIV)
+    if totalRemoved > 0 then
+        print(G + "  [+] " + X + W + totalRemoved + " trace(s) removed from " + C + targetIP + X)
+    else
+        print(D + "  [*] No traces found — already clean." + X)
+    end if
+    print("")
+end function
+
+// --------------------------------------------------------
+// PERSIST — create a backdoor user on a buffered shell target
+// --------------------------------------------------------
+rc_persist = function(idxStr)
+    obj    = get_custom_object
+    shells = obj.RC_SHELLS
+    idx    = idxStr.to_int
+
+    if typeof(idx) == "string" or idx < 0 or idx >= shells.len then
+        print(R + "  [!] Usage: persist [n]  — use 'shells' to list" + X)
+        return
+    end if
+
+    entry    = shells[idx]
+    srvShell = entry["shell"]
+    targetPC = entry["shell"].host_computer
+    targetIP = entry["ip"]
+    level    = entry["level"]
+
+    print(G + "  [ ReCoil ] " + X + W + "Persistence" + X)
+    print(DIV)
+    print(W + "  Target  " + X + C + targetIP + X)
+    print(W + "  Level   " + X + (G + "root" + X if level == "root" else R + level + X))
+    print(DIV)
+
+    if level != "root" then
+        print(R + "  [!] Root access required to create users." + X)
+        print(D + "  [*] Escalate first via exploit." + X)
+        print("")
+        return
+    end if
+
+    // Suggest a low-profile username
+    defaultUser = "syslog"
+    defaultPass = "Rc" + str(floor(rnd * 9000) + 1000)
+
+    print(D + "  Suggested credentials:" + X)
+    print(W + "  User  " + X + Y + defaultUser + X)
+    print(W + "  Pass  " + X + Y + defaultPass + X)
+    print("")
+
+    useDefault = user_input(D + "  Use these? [y/n]: " + X).lower
+    if useDefault != "y" then
+        defaultUser = user_input(W + "  Username : " + X)
+        defaultPass = user_input(W + "  Password : " + X)
+    end if
+
+    print("")
+    print(D + "  Creating backdoor user..." + X)
+
+    result = targetPC.create_user(defaultUser, defaultPass)
+
+    if result == 1 then
+        print(G + "  [+] Backdoor user created: " + X + Y + defaultUser + X)
+
+        // Store in creds
+        if not obj.hasIndex("RC_CREDS")    then obj.RC_CREDS    = {}
+        if not obj.hasIndex("RC_BACKDOORS") then obj.RC_BACKDOORS = []
+
+        obj.RC_CREDS[targetIP] = {"user": defaultUser, "pass": defaultPass}
+        obj.RC_BACKDOORS.push({
+            "ip":   targetIP,
+            "user": defaultUser,
+            "pass": defaultPass,
+            "chain": (entry["chain"] if entry.hasIndex("chain") else targetIP)
+        })
+
+        print(G + "  [+] " + X + "Credentials stored — use " + W + "backdoors" + X + " to list")
+        print(D + "      SSH back in via: " + X + W + "pivot [n] " + targetIP + X)
+
+    else if typeof(result) == "string" then
+        print(R + "  [!] Failed: " + result + X)
+    end if
+
+    print("")
+end function
+
+// --------------------------------------------------------
+// BACKDOORS — list all planted backdoors this session
+// --------------------------------------------------------
+rc_backdoors = function()
+    obj = get_custom_object
+    if not obj.hasIndex("RC_BACKDOORS") or obj.RC_BACKDOORS.len == 0 then
+        print(D + "  [*] No backdoors planted this session." + X)
+        return
+    end if
+
+    print(G + "  [*] " + X + W + "Planted Backdoors" + X)
+    print(DIV)
+    for entry in obj.RC_BACKDOORS
+        chain = (entry["chain"] if entry.hasIndex("chain") else entry["ip"])
+        print(C + "  " + entry["ip"] + X)
+        print(W + "    user  " + X + Y + entry["user"] + X)
+        print(W + "    pass  " + X + Y + entry["pass"] + X)
+        print(D + "    via   " + chain + X)
+        print("")
+    end for
+end function
