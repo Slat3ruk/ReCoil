@@ -91,7 +91,11 @@ rc_pivot = function(idxStr, targetIP)
     end if
 
     col = G
-    if level == "guest" then col = R else if level != "root" then col = Y
+    if level == "guest" then
+        col = R
+    else if level != "root" then
+        col = Y
+    end if
 
     print(col + "  [+] Shell obtained — level: " + level + X)
 
