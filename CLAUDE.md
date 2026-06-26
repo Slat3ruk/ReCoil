@@ -49,7 +49,7 @@ Initialised lazily in `rc_exploit.src` via `_rc_init()`.
 
 ## Colour palette
 
-Defined once in `recoil.src`, available to all modules via import scope:
+Defined once in `recoil.src`, available to all modules via `#include` scope:
 
 ```
 R = red (errors)      G = green (success/headers)   Y = yellow (data/values)
@@ -67,7 +67,6 @@ Always use these — never hardcode colour tags in modules.
 - `scan_address` vuln names are inside `<b>name</b>` tags after `"Unsafe check: "` segments
 - `overflow` returns: `shell` (shell exploit), `computer` (computer exploit), `1/0` (password/settings), `file` (file exploit) — currently only `shell` is handled in `rc_exploit.src`
 - `scp(sourceFile, destFolder, remoteShell, isUpload)` — `0` = pull, `1` = push
-- `import_code` requires the target binary to be built with `allowImport = 1`
 - Max file size: 160,000 characters
 
 ## Server credentials
@@ -76,7 +75,7 @@ Hardcoded at the top of `rc_server.src`:
 ```
 SERVER_IP, SERVER_USER, SERVER_PASS, SERVER_PORT
 ```
-Update before compiling. `SERVER_IP` is also used by `recoil.src` banner for the proxy ping status — it's available because `rc_server.src` is imported before the banner runs.
+Update before compiling. `SERVER_IP` is also used by `recoil.src` banner for the proxy ping status — it's available because `rc_server.src` is `#include`d before the banner runs.
 
 ## API reference
 
