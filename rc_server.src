@@ -71,7 +71,9 @@ server_status = function(srvPC)
     print(W + "  Public IP  " + X + C + srvPC.public_ip + X)
     print(W + "  Hostname   " + X + C + srvPC.get_name + X)
     print(W + "  Net card   " + X + C + srvPC.active_net_card + X)
-    print(W + "  Network    " + X + (G + "active" + X if srvPC.is_network_active else R + "DOWN" + X))
+    netStr = R + "DOWN" + X
+    if srvPC.is_network_active then netStr = G + "active" + X
+    print(W + "  Network    " + X + netStr)
     print("")
 
     // Open ports

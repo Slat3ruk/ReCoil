@@ -131,7 +131,8 @@ while true
     // --- exploit ---
     else if cmd.indexOf("exploit") == 0 then
         parts = cmd.split(" ")
-        ip    = (parts[1] if parts.len > 1 else "")
+        ip = ""
+        if parts.len > 1 then ip = parts[1]
         print("")
         rc_exploit(ip)
 
@@ -144,14 +145,16 @@ while true
     // --- use ---
     else if cmd.indexOf("use") == 0 then
         parts = cmd.split(" ")
-        idx   = (parts[1] if parts.len > 1 else "")
+        idx = ""
+        if parts.len > 1 then idx = parts[1]
         print("")
         rc_use(idx)
 
     // --- drop ---
     else if cmd.indexOf("drop") == 0 then
         parts = cmd.split(" ")
-        idx   = (parts[1] if parts.len > 1 else "")
+        idx = ""
+        if parts.len > 1 then idx = parts[1]
         print("")
         rc_drop(idx)
         print("")
@@ -159,14 +162,16 @@ while true
     // --- clean ---
     else if cmd.indexOf("clean") == 0 then
         parts = cmd.split(" ")
-        idx   = (parts[1] if parts.len > 1 else "")
+        idx = ""
+        if parts.len > 1 then idx = parts[1]
         print("")
         rc_clean(idx)
 
     // --- persist ---
     else if cmd.indexOf("persist") == 0 then
         parts = cmd.split(" ")
-        idx   = (parts[1] if parts.len > 1 else "")
+        idx = ""
+        if parts.len > 1 then idx = parts[1]
         print("")
         rc_persist(idx)
 
@@ -179,25 +184,32 @@ while true
     // --- pivot ---
     else if cmd.indexOf("pivot") == 0 then
         parts = cmd.split(" ")
-        idx   = (parts[1] if parts.len > 1 else "")
-        ip    = (parts[2] if parts.len > 2 else "")
+        idx = ""
+        ip = ""
+        if parts.len > 1 then idx = parts[1]
+        if parts.len > 2 then ip = parts[2]
         print("")
         rc_pivot(idx, ip)
 
     // --- pull ---
     else if cmd.indexOf("pull") == 0 then
         parts = cmd.split(" ")
-        idx   = (parts[1] if parts.len > 1 else "")
-        path  = (parts[2] if parts.len > 2 else "")
+        idx = ""
+        path = ""
+        if parts.len > 1 then idx = parts[1]
+        if parts.len > 2 then path = parts[2]
         print("")
         rc_pull(idx, path)
 
     // --- push ---
     else if cmd.indexOf("push") == 0 then
-        parts      = cmd.split(" ")
-        idx        = (parts[1] if parts.len > 1 else "")
-        localPath  = (parts[2] if parts.len > 2 else "")
-        remotePath = (parts[3] if parts.len > 3 else "/tmp")
+        parts = cmd.split(" ")
+        idx = ""
+        localPath = ""
+        remotePath = "/tmp"
+        if parts.len > 1 then idx = parts[1]
+        if parts.len > 2 then localPath = parts[2]
+        if parts.len > 3 then remotePath = parts[3]
         print("")
         rc_push(idx, localPath, remotePath)
 

@@ -108,7 +108,9 @@ rc_persist = function(idxStr)
     print(G + "  [ ReCoil ] " + X + W + "Persistence" + X)
     print(DIV)
     print(W + "  Target  " + X + C + targetIP + X)
-    print(W + "  Level   " + X + (G + "root" + X if level == "root" else R + level + X))
+    levelStr = R + level + X
+    if level == "root" then levelStr = G + "root" + X
+    print(W + "  Level   " + X + levelStr)
     print(DIV)
 
     if level != "root" then
@@ -145,12 +147,14 @@ rc_persist = function(idxStr)
         if not obj.hasIndex("RC_CREDS")    then obj.RC_CREDS    = {}
         if not obj.hasIndex("RC_BACKDOORS") then obj.RC_BACKDOORS = []
 
+        bdChain = targetIP
+        if entry.hasIndex("chain") then bdChain = entry["chain"]
         obj.RC_CREDS[targetIP] = {"user": defaultUser, "pass": defaultPass}
         obj.RC_BACKDOORS.push({
             "ip":   targetIP,
             "user": defaultUser,
             "pass": defaultPass,
-            "chain": (entry["chain"] if entry.hasIndex("chain") else targetIP)
+            "chain": bdChain
         })
 
         print(G + "  [+] " + X + "Credentials stored — use " + W + "backdoors" + X + " to list")
@@ -176,7 +180,8 @@ rc_backdoors = function()
     print(G + "  [*] " + X + W + "Planted Backdoors" + X)
     print(DIV)
     for entry in obj.RC_BACKDOORS
-        chain = (entry["chain"] if entry.hasIndex("chain") else entry["ip"])
+        chain = entry["ip"]
+        if entry.hasIndex("chain") then chain = entry["chain"]
         print(C + "  " + entry["ip"] + X)
         print(W + "    user  " + X + Y + entry["user"] + X)
         print(W + "    pass  " + X + Y + entry["pass"] + X)

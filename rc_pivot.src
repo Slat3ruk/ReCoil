@@ -33,7 +33,8 @@ rc_pivot = function(idxStr, targetIP)
     entry     = shells[idx]
     hopShell  = entry["shell"]
     hopIP     = entry["ip"]
-    hopChain  = (entry["chain"] if entry.hasIndex("chain") else hopIP)
+    hopChain  = hopIP
+    if entry.hasIndex("chain") then hopChain = entry["chain"]
 
     print(G + "  [ ReCoil ] " + X + W + "Pivot" + X)
     print(DIV)
