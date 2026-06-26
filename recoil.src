@@ -47,37 +47,27 @@ print_banner = function()
     print(G + "  ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝╚══════╝" + X)
     print("")
     print(D + "  --------------------------------" + X + Y + " v1.0 " + X + D + "--------------------------------" + X)
-    myPC  = get_shell.host_computer
+    myPC   = get_shell.host_computer
+    localIP = myPC.local_ip
+    pubIP   = myPC.public_ip
+    if localIP == "0.0.0.0" or localIP == null then localIP = D + "n/a (root shell)" + X
+    if pubIP == "0.0.0.0" or pubIP == null then pubIP = D + "n/a" + X
     print(W + "  user    " + X + C + active_user + X)
-    print(W + "  host    " + X + C + myPC.local_ip + X + D + "  (" + myPC.public_ip + ")" + X)
+    print(W + "  host    " + X + C + localIP + X + D + "  (" + X + C + pubIP + X + D + ")" + X)
     srvStatus = get_shell.ping(SERVER_IP)
     if srvStatus == 1 then
         print(W + "  proxy   " + X + C + SERVER_IP + X + G + "  ● online" + X)
     else
         print(W + "  proxy   " + X + C + SERVER_IP + X + R + "  ● offline" + X)
     end if
-    print(D + "  --------------------------------" + X + G + " tools " + X + D + "--------------------------------" + X)
-    print(D + "  [scan]  " + X + W + "scan       " + X + D + "map the current LAN" + X)
-    print(D + "  [net]   " + X + W + "whois      " + X + D + "lookup a public IP" + X)
-    print(D + "  [net]   " + X + W + "nslookup   " + X + D + "resolve a hostname" + X)
-    print(D + "  [sec]   " + X + W + "secure     " + X + D + "audit and harden this machine" + X)
-    print(D + "  [srv]   " + X + W + "server     " + X + D + "manage and harden proxy server" + X)
-    print(D + "  [xpl]   " + X + W + "exploit    " + X + D + "scan and exploit a target IP" + X)
-    print(D + "  [xpl]   " + X + W + "shells     " + X + D + "list active shell buffer" + X)
-    print(D + "  [xpl]   " + X + W + "use [n]    " + X + D + "interact with a buffered shell" + X)
-    print(D + "  [xpl]   " + X + W + "drop [n]   " + X + D + "remove shell from buffer" + X)
-    print(D + "  [pvt]   " + X + W + "pivot [n]  " + X + D + "SSH to new target through buffer[n]" + X)
-    print(D + "  [pvt]   " + X + W + "pull [n]   " + X + D + "download file from buffer[n]" + X)
-    print(D + "  [pvt]   " + X + W + "push [n]   " + X + D + "upload file to buffer[n]" + X)
-    print(D + "  [pvt]   " + X + W + "creds      " + X + D + "list stored credentials" + X)
-    print(D + "  [ops]   " + X + W + "clean [n]  " + X + D + "wipe your traces from buffer[n]" + X)
-    print(D + "  [ops]   " + X + W + "persist [n]" + X + D + "plant backdoor user on buffer[n]" + X)
-    print(D + "  [ops]   " + X + W + "backdoors  " + X + D + "list planted backdoors" + X)
-    print(D + "  --------------------------------" + X + D + " standalone " + X + D + "-------------------------" + X)
-    print(D + "  [wifi]  " + X + W + "wifi       " + X + D + "launch wifi suite  (crack + hop)" + X)
-    print(D + "  --------------------------------" + X)
-    print(D + "  type " + X + W + "help" + X + D + " for command list   " + X + W + "exit" + X + D + " to quit" + X)
-    print(D + "  --------------------------------" + X)
+    print(DIV)
+    print(D + "  recon  " + X + W + "scan  whois  nslookup" + X)
+    print(D + "  attack " + X + W + "exploit  shells  use  drop" + X)
+    print(D + "  move   " + X + W + "pivot  pull  push  creds" + X)
+    print(D + "  ops    " + X + W + "clean  persist  backdoors" + X)
+    print(D + "  local  " + X + W + "secure  server  wifi" + X)
+    print(DIV)
+    print(D + "  type " + X + W + "help" + X + D + " for details   " + X + W + "exit" + X + D + " to quit" + X)
     print("")
 end function
 
@@ -102,11 +92,11 @@ print_help = function()
     print(Y + "  clean [n]" + X + D + "           — wipe your traces from buffer[n]" + X)
     print(Y + "  persist [n]" + X + D + "         — plant backdoor user on buffer[n]" + X)
     print(Y + "  backdoors" + X + D + "           — list planted backdoors this session" + X)
+    print(Y + "  wifi" + X + D + "          — launch wifi suite in a new terminal" + X)
     print(Y + "  clear" + X + D + "         — redraw the banner" + X)
     print(Y + "  help" + X + D + "          — this list" + X)
     print(Y + "  exit / q" + X + D + "      — quit ReCoil" + X)
     print(DIV)
-    print(D + "  standalone: run " + X + W + "wifi" + X + D + " from your terminal for the WiFi suite" + X)
     print("")
 end function
 
@@ -268,6 +258,11 @@ while true
             end if
             print("")
         end if
+
+    // --- wifi ---
+    else if cmd == "wifi" then
+        print(D + "  [*] launching wifi suite..." + X)
+        get_shell.launch("/bin/wifi")
 
     // --- clear / banner ---
     else if cmd == "clear" then
