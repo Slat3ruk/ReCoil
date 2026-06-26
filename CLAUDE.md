@@ -10,21 +10,18 @@ Scripts are written and compiled via the **greybel-vs** VSCode extension — sou
 
 ## Building
 
-There is no local build or test runner. All compilation happens inside Grey Hack:
+Compiled via the **greybel-vs** VSCode extension. Two entry points, two compiles:
 
-1. SCP or paste each `.src` file into the game
-2. Compile with `shell.build(srcPath, destPath, allowImport)` — modules need `allowImport = 1`
-3. Build order matters — compile modules before the hub:
-   ```
-   rc_scan → rc_secure → rc_server → rc_exploit → rc_pivot → rc_ops → recoil
-   ```
-4. `wifi.src` is independent — compile separately as `/bin/wifi`
+- **`recoil.src`** → compile to `/bin/recoil` — greybel bundles all `#include` modules automatically
+- **`wifi.src`** → compile to `/bin/wifi` — standalone, no dependencies
+
+No manual module pre-compilation needed. greybel-vs follows the `#include` chain from each entry point and produces a single binary.
 
 ## Architecture
 
 Two entry points:
 
-**`recoil.src`** — main hub binary. Uses `import_code("/bin/rc_*")` to pull in all modules at runtime. Defines the shared colour palette (`R G Y C W D X DIV`), `progress_bar()` function, and the main REPL loop. All modules depend on these being in scope.
+**`recoil.src`** — main hub binary. Uses `#include "rc_*.src"` to bundle all modules at compile time via greybel-vs. Defines the shared colour palette (`R G Y C W D X DIV`), `progress_bar()` function, and the main REPL loop. All modules depend on these being in scope.
 
 **`wifi.src`** — fully standalone binary. WiFi cracker + hopper combined under one mini-menu. No hub dependency.
 

@@ -1,12 +1,13 @@
 // ReCoil - Main Hub
 // Usage: build then run /bin/recoil
 
-import_code("/bin/rc_scan")
-import_code("/bin/rc_secure")
-import_code("/bin/rc_server")
-import_code("/bin/rc_exploit")
-import_code("/bin/rc_pivot")
-import_code("/bin/rc_ops")
+// --- Module imports (bundled at compile time by greybel-vs) ---
+#include "rc_scan.src"
+#include "rc_secure.src"
+#include "rc_server.src"
+#include "rc_exploit.src"
+#include "rc_pivot.src"
+#include "rc_ops.src"
 
 // --- ReCoil colour palette (shared with all modules) ---
 R = "<color=#FF4444><b>"
